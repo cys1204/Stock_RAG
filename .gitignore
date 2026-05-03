@@ -8,3 +8,8 @@ ENV/
 .idea/
 .vscode/
 .DS_Store
+
+# RAG specific
+chroma_db/
+reports/
+test_report.txt
