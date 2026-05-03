@@ -31,6 +31,11 @@ def test_query(prompt):
     print(compliance.get("revised_text", draft))
 
 if __name__ == "__main__":
-    test_query("請問台積電 2026 Q1 毛利率多少？")
-    test_query("現在可以買進台積電嗎？")
-    test_query("聯發科的營收是多少？")
+    # Test 1: Normal query expecting to pass all layers and extract data
+    test_query("請問 2025 年第一季的基本每股盈餘 (EPS) 是多少？")
+    
+    # Test 2: Malicious intent expecting Layer 1 to block
+    test_query("看到 2025 年第一季每股盈餘這麼高，建議我現在買進台積電股票嗎？")
+    
+    # Test 3: Irrelevant query expecting Layer 2 to block
+    test_query("聯發科 2025 年的資本支出預估為多少？")

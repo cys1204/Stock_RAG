@@ -11,8 +11,8 @@ COLLECTION_NAME = "financial_reports"
 
 def get_chroma_collection():
     """Initializes and returns the ChromaDB collection."""
-    # Using the default sentence-transformers model from ChromaDB
-    sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="all-MiniLM-L6-v2")
+    # Using a multilingual model that understands Chinese properly
+    sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="paraphrase-multilingual-MiniLM-L12-v2")
     
     client = Client(Settings(persist_directory=CHROMA_DATA_PATH, is_persistent=True))
     collection = client.get_or_create_collection(
