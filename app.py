@@ -1,5 +1,6 @@
 import streamlit as st
 import os
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
 import tempfile
 from data_ingestion import process_pdf_and_store
 from retriever import retrieve_context
@@ -19,23 +20,24 @@ st.markdown("一個擁有 5 道資安防線的企業級金融問答系統")
 # --- Sidebar: Data Ingestion ---
 with st.sidebar:
     st.header("📂 資料庫管理")
-    uploaded_files = st.file_uploader("上傳金融報告 (PDF)", type=["pdf"], accept_multiple_files=True)
+    uploaded_files = st.file_uploader("上傳金融報告 (PDF/TXT)", type=["pdf", "txt"], accept_multiple_files=True)
     if uploaded_files:
         if st.button("處理並寫入知識庫"):
             with st.spinner("處理中..."):
                 for uploaded_file in uploaded_files:
-                    # Save uploaded file to a temporary file
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=".pdf") as tmp_file:
-                        tmp_file.write(uploaded_file.getvalue())
-                        tmp_file_path = tmp_file.name
-                    
-                    try:
-                        process_pdf_and_store(tmp_file_path)
-                        st.success(f"✅ {uploaded_file.name} 已成功寫入！")
-                    except Exception as e:
-                        st.error(f"寫入 {uploaded_file.name} 失敗: {e}")
-                    finally:
-                        os.unlink(tmp_file_path)
+                    # Save uploaded file to a temporary directory to preserve original filename
+                    with tempfile.TemporaryDirectory() as temp_dir:
+                        original_name = uploaded_file.name
+                        tmp_file_path = os.path.join(temp_dir, original_name)
+                        
+                        with open(tmp_file_path, "wb") as f:
+                            f.write(uploaded_file.getvalue())
+                        
+                        try:
+                            process_pdf_and_store(tmp_file_path)
+                            st.success(f"✅ {original_name} 已成功寫入！")
+                        except Exception as e:
+                            st.error(f"寫入 {original_name} 失敗: {e}")
 
 # --- Main Chat Interface ---
 st.header("💬 智能金融問答")

@@ -13,3 +13,4 @@ ENV/
 chroma_db/
 reports/
 test_report.txt
+markdown_cache/

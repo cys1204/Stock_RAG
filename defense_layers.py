@@ -68,6 +68,7 @@ Context:
         )
         return json.loads(response.choices[0].message.content)
     except Exception as e:
+        print(f"Exception in check_relevance: {e}")
         # Default to pass to avoid over-blocking, or block for extreme safety.
         # Here we choose block for strict financial compliance.
         return {"status": "block", "reason": "相關性檢查系統異常"}

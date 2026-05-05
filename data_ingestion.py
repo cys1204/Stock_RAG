@@ -1,4 +1,5 @@
 import os
+os.environ["ANONYMIZED_TELEMETRY"] = "False"
 from typing import List
 from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
@@ -14,7 +15,11 @@ def get_chroma_collection():
     # Using a multilingual model that understands Chinese properly
     sentence_transformer_ef = embedding_functions.SentenceTransformerEmbeddingFunction(model_name="paraphrase-multilingual-MiniLM-L12-v2")
     
-    client = Client(Settings(persist_directory=CHROMA_DATA_PATH, is_persistent=True))
+    import chromadb
+    client = chromadb.PersistentClient(
+        path=CHROMA_DATA_PATH,
+        settings=Settings(anonymized_telemetry=False)
+    )
     collection = client.get_or_create_collection(
         name=COLLECTION_NAME,
         embedding_function=sentence_transformer_ef,
@@ -32,15 +37,28 @@ def process_pdf_and_store(file_path: str):
 
     # 1. Load File
     if file_path.lower().endswith(".pdf"):
-        loader = PyPDFLoader(file_path)
+        import pymupdf4llm
+        from langchain.docstore.document import Document
+        
+        # Convert to Markdown
+        md_text = pymupdf4llm.to_markdown(file_path)
+        
+        # Save to markdown_cache for inspection
+        os.makedirs("markdown_cache", exist_ok=True)
+        base_name = os.path.basename(file_path).replace(".pdf", ".md")
+        md_path = os.path.join("markdown_cache", base_name)
+        with open(md_path, "w", encoding="utf-8") as f:
+            f.write(md_text)
+            
+        documents = [Document(page_content=md_text, metadata={"source": file_path, "page": 0})]
+        print(f"Loaded {file_path} and converted to Markdown (saved to {md_path}).")
+        
     elif file_path.lower().endswith(".txt"):
         loader = TextLoader(file_path, encoding='utf-8')
+        documents = loader.load()
+        print(f"Loaded {len(documents)} txt pages.")
     else:
         raise ValueError("Unsupported file format. Only PDF and TXT are supported.")
-        
-    documents = loader.load()
-    print(f"Loaded {len(documents)} pages.")
-
     # 2. Split Text
     text_splitter = RecursiveCharacterTextSplitter(
         chunk_size=1000,
@@ -60,7 +78,7 @@ def process_pdf_and_store(file_path: str):
     ids_list = [f"{os.path.basename(file_path)}_chunk_{i}" for i in range(len(chunks))]
 
     print("Generating embeddings and saving to ChromaDB...")
-    collection.add(
+    collection.upsert(
         documents=documents_list,
         metadatas=metadatas_list,
         ids=ids_list

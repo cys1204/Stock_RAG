@@ -1,7 +1,7 @@
 import os
 from data_ingestion import get_chroma_collection
 
-def retrieve_context(query: str, top_k: int = 10) -> str:
+def retrieve_context(query: str, top_k: int = 4) -> str:
     """
     Retrieves the most relevant chunks for the given query from ChromaDB.
     Returns the concatenated text chunks with their sources.
