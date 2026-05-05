@@ -1,6 +1,7 @@
 # 🛡️ Secure Financial RAG System
 
 一個具備 **5 道資安防線**的企業級金融問答系統。本專案透過檢索增強生成 (RAG) 架構結合多層防護機制，確保大型語言模型 (LLM) 在回答金融財報問題時，能嚴格遵守合規性、避免幻覺（Hallucination），並拒絕提供任何投資建議。
+<img width="1917" height="924" alt="image" src="https://github.com/user-attachments/assets/b4d88834-78ed-46f4-943c-72755be5cda0" />
 
 ## 🌟 系統特色 (Current Features)
 
