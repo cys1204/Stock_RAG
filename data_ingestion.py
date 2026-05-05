@@ -5,6 +5,36 @@ from langchain_community.document_loaders import PyPDFLoader, TextLoader
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from chromadb import Client, Settings
 from chromadb.utils import embedding_functions
+import json
+import os
+from dotenv import load_dotenv
+from groq import Groq
+
+load_dotenv()
+def extract_document_metadata(text: str) -> dict:
+    """Uses LLM to extract company name and year from the beginning of the document."""
+    try:
+        client = Groq(api_key=os.environ.get("GROQ_API_KEY"))
+        system_prompt = (
+            "你是一個資料分析助手。請從以下財報內容的開頭擷取「公司全名或簡稱」與「財報年份」。\n"
+            "請只輸出合法的 JSON 格式，不要包含任何其他文字或 Markdown 標籤，例如：{\"company\": \"台積電\", \"year\": \"114\"}。"
+        )
+        response = client.chat.completions.create(
+            model="llama-3.1-8b-instant",
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": f"文件內容：\n{text[:2000]}"}
+            ],
+            temperature=0.1,
+            response_format={"type": "json_object"}
+        )
+        
+        result = response.choices[0].message.content
+        data = json.loads(result)
+        return {"company": data.get("company", "Unknown"), "year": str(data.get("year", "Unknown"))}
+    except Exception as e:
+        print(f"Metadata extraction failed: {e}")
+        return {"company": "Unknown", "year": "Unknown"}
 
 # Configure ChromaDB Client (Persistent Storage)
 CHROMA_DATA_PATH = "./chroma_db"
@@ -53,12 +83,16 @@ def process_pdf_and_store(file_path: str):
         documents = [Document(page_content=md_text, metadata={"source": file_path, "page": 0})]
         print(f"Loaded {file_path} and converted to Markdown (saved to {md_path}).")
         
-    elif file_path.lower().endswith(".txt"):
+    elif file_path.lower().endswith((".txt", ".md")):
         loader = TextLoader(file_path, encoding='utf-8')
         documents = loader.load()
-        print(f"Loaded {len(documents)} txt pages.")
+        print(f"Loaded {len(documents)} txt/md pages.")
     else:
-        raise ValueError("Unsupported file format. Only PDF and TXT are supported.")
+        raise ValueError("Unsupported file format. Only PDF, TXT, and MD are supported.")
+        
+    print("Extracting metadata via LLM...")
+    doc_meta = extract_document_metadata(documents[0].page_content)
+    print(f"Extracted Metadata: {doc_meta}")
     # 2. Split Text
     from langchain.text_splitter import MarkdownHeaderTextSplitter
     headers_to_split_on = [
@@ -95,7 +129,21 @@ def process_pdf_and_store(file_path: str):
     
     # Prepare data for Chroma
     documents_list = [chunk.page_content for chunk in chunks]
-    metadatas_list = [{"source": file_path, "page": chunk.metadata.get("page", 0)} for chunk in chunks]
+    
+    metadatas_list = []
+    for chunk in chunks:
+        meta = {
+            "source": file_path, 
+            "page": chunk.metadata.get("page", 0),
+            "company": doc_meta["company"],
+            "year": doc_meta["year"]
+        }
+        # Include markdown headers if present
+        for key in ["Header 1", "Header 2", "Header 3"]:
+            if key in chunk.metadata:
+                meta[key] = chunk.metadata[key]
+        metadatas_list.append(meta)
+        
     ids_list = [f"{os.path.basename(file_path)}_chunk_{i}" for i in range(len(chunks))]
 
     print("Generating embeddings and saving to ChromaDB...")
@@ -115,7 +163,7 @@ def process_directory(directory_path: str):
         return
 
     for filename in os.listdir(directory_path):
-        if filename.lower().endswith((".pdf", ".txt")):
+        if filename.lower().endswith((".pdf", ".txt", ".md")):
             file_path = os.path.join(directory_path, filename)
             try:
                 process_pdf_and_store(file_path)
