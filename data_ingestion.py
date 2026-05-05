@@ -60,13 +60,34 @@ def process_pdf_and_store(file_path: str):
     else:
         raise ValueError("Unsupported file format. Only PDF and TXT are supported.")
     # 2. Split Text
+    from langchain.text_splitter import MarkdownHeaderTextSplitter
+    headers_to_split_on = [
+        ("#", "Header 1"),
+        ("##", "Header 2"),
+        ("###", "Header 3"),
+    ]
+    markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
+    
     text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
+        chunk_size=1500,
         chunk_overlap=200,
         length_function=len,
         separators=["\n\n", "\n", "。", "，", " ", ""]
     )
-    chunks = text_splitter.split_documents(documents)
+
+    chunks = []
+    for doc in documents:
+        # First split by Markdown Headers
+        md_header_splits = markdown_splitter.split_text(doc.page_content)
+        
+        # Preserve original metadata (like source file)
+        for split in md_header_splits:
+            split.metadata.update(doc.metadata)
+            
+        # Then split by Character length if still too long
+        sub_chunks = text_splitter.split_documents(md_header_splits)
+        chunks.extend(sub_chunks)
+
     print(f"Split into {len(chunks)} chunks.")
 
     # 3. Store in ChromaDB
